@@ -1,34 +1,48 @@
 package st.process.squala
 
+import st.process.squala.expressions._
+import st.process.squala.operations.{OrOp, EqualsOp, AndOp}
+
 // Loosely following this BNF: http://savage.net.au/SQL/sql-92.bnf.html
 
-case class Select(columnNames: Seq[String]) {
+trait Sqlable {
 
-    def from(tableName: String) = From(Select(columnNames), tableName, optionalAlias = None)
-
-    override def toString = "select " + columnNames.mkString(", ")
+    def sql: String
 
 }
 
-case class From(selectList: Select, tableName: String, optionalAlias: Option[String]) {
+case class Select(columnNames: Seq[String]) extends Sqlable {
+
+    def from(tableName: String) = From(Select(columnNames), tableName, optionalAlias = None)
+
+    lazy val sql = "select " + columnNames.mkString(", ")
+
+    override def toString = sql
+
+}
+
+case class From(selectList: Select, tableName: String, optionalAlias: Option[String]) extends Sqlable {
 
     def as(alias: String) = copy(optionalAlias = Some(alias))
     
     def where(searchCondition: SearchCond) = Where(this, searchCondition)
 
-    override def toString =
-        List(Some(selectList.toString), Some("from"), Some(tableName), optionalAlias)
+    lazy val sql = List(Some(selectList.sql), Some("from"), Some(tableName), optionalAlias)
         .flatten.mkString(" ")
 
-}
-
-case class Where(from: From, searchCondition: SearchCond) {
-
-    override def toString = List(from.toString, "where " + searchCondition.toString).mkString(" ")
+    override def toString = sql
 
 }
 
-abstract class SearchCond {
+case class Where(from: From, searchCondition: SearchCond) extends Sqlable {
+
+    lazy val sql = List(from.sql, "where " + searchCondition.sql).mkString(" ")
+
+    override def toString = sql
+
+}
+
+abstract class SearchCond extends Sqlable {
 
     def ===(that: SearchCond) = EqualsOp(this, that)
 
@@ -38,39 +52,20 @@ abstract class SearchCond {
 
 }
 
-case class EqualsOp(lhs: SearchCond, rhs: SearchCond) extends SearchCond {
-    override def toString = s"($lhs = $rhs)"
-}
+object SqualaImplicits {
 
-case class AndOp(lhs: SearchCond, rhs: SearchCond) extends SearchCond {
-    override def toString = s"($lhs and $rhs)"
-}
+    implicit def sqlableToSqlExpr(sqlable: Sqlable): SqlExpr = SqlExpr(sqlable.sql)
+    implicit def stringToRefExpr(columnName: String): RefExpr = RefExpr(columnName)
+    implicit def intToIntExpr(value: Int): IntExpr = IntExpr(value)
 
-case class OrOp(lhs: SearchCond, rhs: SearchCond) extends SearchCond {
-    override def toString = s"($lhs or $rhs)"
-}
-
-case class RefExpr(columnName: String) extends SearchCond {
-    override def toString = columnName
-}
-
-case class StrExpr(value: String) extends SearchCond {
-    override def toString = Squala.quote(value)
-}
-
-case class IntExpr(value: Int) extends SearchCond {
-    override def toString = value.toString
 }
 
 object Squala {
 
-    implicit def symbolToRefExpr(columnName: Symbol): RefExpr = RefExpr(columnName.name)
-    implicit def stringToStrExpr(value: String): StrExpr = StrExpr(value)
-    implicit def intToIntExpr(value: Int): IntExpr = IntExpr(value)
-
     def select(columnNames: String*) = Select(columnNames)
 
-    def quote(value: String) = "'%s'".format(escape(value))
-    def escape(value: String) = value.replaceAll("'", "''")
+    def literal(value: String) = StrExpr(value)
+    def sql(sql: String) = SqlExpr(sql)
+
 
 }
