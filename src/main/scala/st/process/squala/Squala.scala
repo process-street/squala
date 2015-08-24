@@ -81,6 +81,8 @@ object SqualaImplicits {
         case (qualifier, columnName) => QualifiedRefExpr(qualifier, columnName)
     }
 
+    implicit def booleanToBoolExpr(value: Boolean): BoolExpr = BoolExpr(value)
+
     implicit def intToIntExpr(value: Int): IntExpr = IntExpr(value)
 
 }
