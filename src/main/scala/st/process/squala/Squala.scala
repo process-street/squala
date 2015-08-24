@@ -15,7 +15,7 @@ trait Query {
 
 case class Select(columnNames: Seq[String]) extends Query {
 
-    def from(tableName: String) = From(Select(columnNames), tableName, optionalAlias = None)
+    def from(tableName: String) = From(Select(columnNames), tableName, optionalAlias = None, joins = List.empty)
 
     lazy val sql = "select " + columnNames.mkString(", ")
 
@@ -23,34 +23,49 @@ case class Select(columnNames: Seq[String]) extends Query {
 
 }
 
-case class From(selectList: Select, tableName: String, optionalAlias: Option[String]) extends Query {
+case class From(selectList: Select, tableName: String, optionalAlias: Option[String], joins: List[Join]) extends Query {
 
     def as(alias: String) = copy(optionalAlias = Some(alias))
 
-    def where(searchCondition: SearchCond) = Where(this, searchCondition)
+    def innerJoin(tableName: String, alias: String) = Joiner(this, "inner", tableName, alias)
 
-    lazy val sql = List(Some(selectList.sql), Some("from"), Some(tableName), optionalAlias)
-        .flatten.mkString(" ")
+    def where(searchCondition: Cond) = Where(this, searchCondition)
 
-    override def toString = sql
-
-}
-
-case class Where(from: From, searchCond: SearchCond) extends Query {
-
-    lazy val sql = List(from.sql, "where " + searchCond.sql).mkString(" ")
+    lazy val sql =
+        (List(Some(selectList.sql), Some("from"), Some(tableName), optionalAlias).flatten ++ joins.map(_.sql))
+            .mkString(" ")
 
     override def toString = sql
 
 }
 
-abstract class SearchCond {
+case class Joiner(from: From, tpe: String, tableName: String, alias: String) {
 
-    def ===(that: SearchCond) = EqualsOp(this, that)
+    def on (cond: Cond) = from.copy(joins = from.joins :+ Join(tpe, tableName, alias, cond))
+    
+}
 
-    def and(that: SearchCond) = AndOp(this, that)
+case class Join(tpe: String, tableName: String, alias: String, cond: Cond) {
 
-    def or(that: SearchCond) = OrOp(this, that)
+    lazy val sql = s"$tpe join $tableName $alias on ${cond.sql}"
+
+}
+
+case class Where(from: From, cond: Cond) extends Query {
+
+    lazy val sql = List(from.sql, "where " + cond.sql).mkString(" ")
+
+    override def toString = sql
+
+}
+
+abstract class Cond {
+
+    def ===(that: Cond) = EqualsOp(this, that)
+
+    def and(that: Cond) = AndOp(this, that)
+
+    def or(that: Cond) = OrOp(this, that)
 
     def sql: String
 
@@ -77,6 +92,5 @@ object Squala {
     def literal(value: String) = StrExpr(value)
 
     def sql(sql: String) = SqlExpr(sql)
-
 
 }

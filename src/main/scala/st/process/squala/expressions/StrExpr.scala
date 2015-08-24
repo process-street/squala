@@ -1,8 +1,8 @@
 package st.process.squala.expressions
 
-import st.process.squala.SearchCond
+import st.process.squala.Cond
 
-case class StrExpr(value: String) extends SearchCond {
+case class StrExpr(value: String) extends Cond {
 
     lazy val sql = quote(value)
 

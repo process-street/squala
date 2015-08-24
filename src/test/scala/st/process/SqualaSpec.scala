@@ -42,4 +42,16 @@ class SqualaSpec extends FlatSpec with Matchers {
         q2.sql should be ("select * from bar where exists (select * from foo)")
     }
 
+    "a select * from a table joined with another table" should "generate correct SQL" in {
+        val q = select("*") from "foo" as "f" innerJoin ("bar", "b") on ("b.id" === "f.bar_id")
+        q.sql should be ("select * from foo f inner join bar b on (b.id = f.bar_id)")
+    }
+
+    "a select * from a table joined with 2 tables" should "generate correct SQL" in {
+        val q = select("*").from("foo").as("f")
+            .innerJoin("bar", "b").on("b.id" === "f.bar_id")
+            .innerJoin("baz", "z").on("z.id" === "b.baz_id")
+        q.sql should be ("select * from foo f inner join bar b on (b.id = f.bar_id) inner join baz z on (z.id = b.baz_id)")
+    }
+
 }

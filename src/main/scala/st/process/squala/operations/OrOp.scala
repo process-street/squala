@@ -1,7 +1,7 @@
 package st.process.squala.operations
 
-import st.process.squala.SearchCond
+import st.process.squala.Cond
 
-case class OrOp(lhs: SearchCond, rhs: SearchCond) extends SearchCond {
+case class OrOp(lhs: Cond, rhs: Cond) extends Cond {
     lazy val sql = s"(${lhs.sql} or ${rhs.sql})"
 }
