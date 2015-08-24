@@ -1,3 +1,5 @@
+organization := "st.process"
+
 name := "squala"
 
 version := "0.1.0"

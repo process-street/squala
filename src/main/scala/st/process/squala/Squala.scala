@@ -65,6 +65,10 @@ case class Where(from: From, cond: Cond) extends Query {
 
     lazy val sql = List(from.sql, "where " + cond.sql).mkString(" ")
 
+    def and = BinaryOpBuilder(AndOp, cond, Where(from, _))
+
+    def or = BinaryOpBuilder(OrOp, cond, Where(from, _))
+
     override def toString = sql
 
 }
@@ -75,9 +79,9 @@ trait Cond extends Unary[Cond] {
 
     def !==(that: Cond) = NotEqualsOp(this, that)
 
-    def and(that: Cond) = AndOp(this, that)
+    def and = BinaryOpBuilder(AndOp, this, identity)
 
-    def or(that: Cond) = OrOp(this, that)
+    def or = BinaryOpBuilder(OrOp, this, identity)
 
     override def not = NotBuilder(identity)
 
@@ -89,11 +93,23 @@ trait Cond extends Unary[Cond] {
 
 }
 
+case class BinaryOpBuilder[A](binaryOp: (Cond, Cond) => Cond, cond: Cond, f: Cond => A) extends Unary[A] {
+
+    def apply(that: Cond) = f(binaryOp(cond, that))
+
+    def not = NotBuilder { that => f(binaryOp(cond, that))}
+
+    override def exists(q: Query) = f(binaryOp(cond, ExistsOp(q)))
+
+    override def in(q: Query) = f(binaryOp(cond, InOp(q)))
+
+}
+
 case class NotBuilder[A](f: Cond => A) extends Unary[A] {
 
-    def apply(cond: Cond) = f(NotOp(cond))
+    def apply(that: Cond) = f(NotOp(that))
 
-    def not = NotBuilder { cond => f(NotOp(cond))}
+    def not = NotBuilder { that => f(NotOp(that))}
 
     override def exists(q: Query) = f(NotOp(ExistsOp(q)))
 
