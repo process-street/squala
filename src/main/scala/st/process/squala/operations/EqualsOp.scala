@@ -7,3 +7,9 @@ case class EqualsOp(lhs: Cond, rhs: Cond) extends Cond {
     lazy val sql = s"(${lhs.sql} = ${rhs.sql})"
 
 }
+
+case class NotEqualsOp(lhs: Cond, rhs: Cond) extends Cond {
+
+    lazy val sql = s"(${lhs.sql} <> ${rhs.sql})"
+
+}

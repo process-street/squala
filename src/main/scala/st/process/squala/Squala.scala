@@ -7,8 +7,6 @@ import st.process.squala.operations._
 
 trait Query {
 
-    def exists = ExistsOp(this)
-
     def sql: String
 
 }
@@ -27,9 +25,9 @@ case class From(selectList: Select, tableName: String, optionalAlias: Option[Str
 
     def as(alias: String) = copy(optionalAlias = Some(alias))
 
-    def innerJoin(tableName: String, alias: String) = Joiner(this, "inner", tableName, alias)
+    def innerJoin(tableName: String, alias: String) = JoinBuilder(this, "inner", tableName, alias)
 
-    def where(searchCondition: Cond) = Where(this, searchCondition)
+    def where = WhereBuilder(this)
 
     lazy val sql =
         (List(Some(selectList.sql), Some("from"), Some(tableName), optionalAlias).flatten ++ joins.map(_.sql))
@@ -39,7 +37,7 @@ case class From(selectList: Select, tableName: String, optionalAlias: Option[Str
 
 }
 
-case class Joiner(from: From, tpe: String, tableName: String, alias: String) {
+case class JoinBuilder(from: From, tpe: String, tableName: String, alias: String) {
 
     def on (cond: Cond) = from.copy(joins = from.joins :+ Join(tpe, tableName, alias, cond))
     
@@ -51,6 +49,18 @@ case class Join(tpe: String, tableName: String, alias: String, cond: Cond) {
 
 }
 
+case class WhereBuilder(from: From) extends Unary[Where] {
+
+    def apply(cond: Cond) = Where(from, cond)
+
+    override def not = NotBuilder(Where(from, _))
+
+    override def exists(q: Query) = Where(from, ExistsOp(q))
+
+    override def in(q: Query) = Where(from, InOp(q))
+
+}
+
 case class Where(from: From, cond: Cond) extends Query {
 
     lazy val sql = List(from.sql, "where " + cond.sql).mkString(" ")
@@ -59,15 +69,45 @@ case class Where(from: From, cond: Cond) extends Query {
 
 }
 
-abstract class Cond {
+trait Cond extends Unary[Cond] {
 
     def ===(that: Cond) = EqualsOp(this, that)
+
+    def !==(that: Cond) = NotEqualsOp(this, that)
 
     def and(that: Cond) = AndOp(this, that)
 
     def or(that: Cond) = OrOp(this, that)
 
+    override def not = NotBuilder(identity)
+
+    override def exists(q: Query) = ExistsOp(q)
+
+    override def in(q: Query) = InOp(q)
+
     def sql: String
+
+}
+
+case class NotBuilder[A](f: Cond => A) extends Unary[A] {
+
+    def apply(cond: Cond) = f(NotOp(cond))
+
+    def not = NotBuilder { cond => f(NotOp(cond))}
+
+    override def exists(q: Query) = f(NotOp(ExistsOp(q)))
+
+    override def in(q: Query) = f(NotOp(InOp(q)))
+
+}
+
+trait Unary[A] {
+
+    def not: NotBuilder[A]
+
+    def exists(q: Query): A
+
+    def in(q: Query): A
 
 }
 
@@ -90,6 +130,8 @@ object SqualaImplicits {
 object Squala {
 
     def select(columnNames: String*) = Select(columnNames)
+
+    // TODO These are temporary, they should not require import
 
     def literal(value: String) = StrExpr(value)
 

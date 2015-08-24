@@ -16,12 +16,41 @@ This will be expanded later.
 
 ## Notes
 
+Squala is easiest to use if you import its implicits and the functions from the Squala object.
+
 ```scala
+scala> import st.process.squala.SqualaImplicits._
+import st.process.squala.SqualaImplicits._
+
 scala> import st.process.squala.Squala._
 import st.process.squala.Squala._
 
-scala> select("x", "y", "z").from("foo").sql
-res1: String = select x, y, z from foo
+scala> (select ("*") from "foo").sql
+res0: String = select * from foo
+```
+
+Squala can do more than just select from a table. Among other features, it supports table aliases, literals, and where
+clauses.
+
+```scala
+scala> (select ("*") from "foo" as "f" where ("f.bar" === 42)).sql
+res1: String = select * from foo f where (f.bar = 42)
+
+scala> (select ("*") from "users" as "u" where ("u.login_count" === 42 and "u.email_verified" === false)).sql
+res2: String = select * from users u where ((u.login_count = 42) and (u.email_verified = 0))
+```
+
+Squala also supports joins and sub-queries:
+
+```scala
+scala> (select ("*") from "users" as "u" innerJoin ("identities", "i") on ("i.id" === "u.identity_id")).sql
+res3: String = select * from users u inner join identities i on (i.id = u.identity_id)
+
+scala> val q1 = select ("*") from "foo"
+res4: st.process.squala.From = select * from foo
+
+scala> (select ("*") from "bar" where (q1 exists)).sql
+res5: String = select * from bar where exists (select * from foo)
 ```
 
 ## Author
