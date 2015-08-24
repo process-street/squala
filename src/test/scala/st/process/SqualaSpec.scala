@@ -22,6 +22,11 @@ class SqualaSpec extends FlatSpec with Matchers {
         (select ("*") from "foo" where("bar" === 42)).sql should be ("select * from foo where (bar = 42)")
     }
 
+    "a select * from a table where a qualified field equals an int literal" should "generate correct SQL" in {
+        (select ("*") from "foo" as "f" where(("f", "bar") === 42)).sql should
+            be ("select * from foo f where (\"f\".bar = 42)")
+    }
+
     "a select * from a table where a field equals a string literal" should "generate correct SQL" in {
         (select ("*") from "foo" where("bar" === literal("x"))).sql should be ("select * from foo where (bar = 'x')")
     }
@@ -29,6 +34,12 @@ class SqualaSpec extends FlatSpec with Matchers {
     "a select * from a table where two fields equal two int literals" should "generate correct SQL" in {
         (select ("*") from "foo" where("bar" === 42 and "baz" === 44)).sql should
             be ("select * from foo where ((bar = 42) and (baz = 44))")
+    }
+
+    "a select * from a table where exists a sub-query" should "generate correct SQL" in {
+        val q1 = select("*") from "foo"
+        val q2 = select("*") from "bar" where (q1 exists)
+        q2.sql should be ("select * from bar where exists (select * from foo)")
     }
 
 }
