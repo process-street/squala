@@ -49,7 +49,7 @@ res3: String = select * from users u inner join identities i on (i.id = u.identi
 scala> val q1 = select ("*") from "foo"
 res4: st.process.squala.From = select * from foo
 
-scala> (select ("*") from "bar" where (q1 exists)).sql
+scala> ((select ("*") from "bar").where exists q1).sql
 res5: String = select * from bar where exists (select * from foo)
 ```
 
