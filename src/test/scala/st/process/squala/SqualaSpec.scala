@@ -39,6 +39,10 @@ class SqualaSpec extends FlatSpec {
         (select("*") from "foo" where ("bar" === literal("x"))).sql should be("select * from foo where (bar = 'x')")
     }
 
+    "a select * from a table where a field is null" should "generate correct SQL" in {
+        (select("*") from "foo" where ("bar" isNull)).sql should be("select * from foo where (bar is null)")
+    }
+
     "a select * from a table where a qualified field equals an int literal" should "generate correct SQL" in {
         (select("*") from "foo" as "f" where (("f", "bar") === 42)).sql should
             be("""select * from foo "f" where ("f".bar = 42)""")
@@ -59,6 +63,12 @@ class SqualaSpec extends FlatSpec {
         val q1 = select("*") from "foo"
         val q2 = (select("*") from "bar").where.not.exists(q1)
         q2.sql should be("select * from bar where not (exists (select * from foo))")
+    }
+
+    "a select * from a table where not not exists a sub-query" should "generate correct SQL" in {
+        val q1 = select("*") from "foo"
+        val q2 = (select("*") from "bar").where.not.not.exists(q1)
+        q2.sql should be("select * from bar where not (not (exists (select * from foo)))")
     }
 
     "a select * from a table joined with another table" should "generate correct SQL" in {

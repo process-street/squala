@@ -1,7 +1,6 @@
 package st.process.squala
 
 import st.process.squala.expressions._
-import st.process.squala.operations._
 
 // Loosely following this BNF: http://savage.net.au/SQL/sql-92.bnf.html
 
@@ -52,11 +51,11 @@ case class Join(tpe: String, tableName: String, alias: String, cond: Cond) {
 
 }
 
-case class WhereBuilder(from: From) extends Unary[Where] {
+case class WhereBuilder(from: From) extends Prefix[Where] {
 
     def apply(cond: Cond) = Where(from, cond)
 
-    override def not = NotBuilder(Where(from, _))
+    override def not = PrefixOpBuilder(NotOp)(Where(from, _))
 
     override def exists(q: Query) = Where(from, ExistsOp(q))
 
@@ -68,25 +67,29 @@ case class Where(from: From, cond: Cond) extends Query {
 
     lazy val sql = List(from.sql, "where " + cond.sql).mkString(" ")
 
-    def and = BinaryOpBuilder(AndOp, cond, Where(from, _))
+    def and = InfixOpBuilder(AndOp, cond)(Where(from, _))
 
-    def or = BinaryOpBuilder(OrOp, cond, Where(from, _))
+    def or = InfixOpBuilder(OrOp, cond)(Where(from, _))
 
     override def toString = sql
 
 }
 
-trait Cond extends Unary[Cond] {
+trait Cond extends Prefix[Cond] {
 
     def ===(that: Cond) = EqualsOp(this, that)
 
     def !==(that: Cond) = NotEqualsOp(this, that)
 
-    def and = BinaryOpBuilder(AndOp, this, identity)
+    def and = InfixOpBuilder(AndOp, this)(identity)
 
-    def or = BinaryOpBuilder(OrOp, this, identity)
+    def or = InfixOpBuilder(OrOp, this)(identity)
 
-    override def not = NotBuilder(identity)
+    def isNull = IsNullOp(this)
+
+    def isNotNull = IsNotNullOp(this)
+
+    override def not = PrefixOpBuilder(NotOp)(identity)
 
     override def exists(q: Query) = ExistsOp(q)
 
@@ -96,33 +99,33 @@ trait Cond extends Unary[Cond] {
 
 }
 
-case class BinaryOpBuilder[A](binaryOp: (Cond, Cond) => Cond, cond: Cond, f: Cond => A) extends Unary[A] {
+case class InfixOpBuilder[A](op: (Cond, Cond) => Cond, lhs: Cond)(f: Cond => A) extends Prefix[A] {
 
-    def apply(that: Cond) = f(binaryOp(cond, that))
+    def apply(rhs: Cond) = f(op(lhs, rhs))
 
-    def not = NotBuilder { that => f(binaryOp(cond, that))}
+    def not = PrefixOpBuilder(NotOp) { rhs => f(op(lhs, rhs))}
 
-    override def exists(q: Query) = f(binaryOp(cond, ExistsOp(q)))
+    override def exists(q: Query) = f(op(lhs, ExistsOp(q)))
 
-    override def in(q: Query) = f(binaryOp(cond, InOp(q)))
-
-}
-
-case class NotBuilder[A](f: Cond => A) extends Unary[A] {
-
-    def apply(that: Cond) = f(NotOp(that))
-
-    def not = NotBuilder { that => f(NotOp(that))}
-
-    override def exists(q: Query) = f(NotOp(ExistsOp(q)))
-
-    override def in(q: Query) = f(NotOp(InOp(q)))
+    override def in(q: Query) = f(op(lhs, InOp(q)))
 
 }
 
-trait Unary[A] {
+case class PrefixOpBuilder[A](op: Cond => Cond)(f: Cond => A) extends Prefix[A] {
 
-    def not: NotBuilder[A]
+    def apply(operand: Cond) = f(op(operand))
+
+    def not = PrefixOpBuilder[A](NotOp) { operand => f(op(operand)) }
+
+    override def exists(q: Query) = f(op(ExistsOp(q)))
+
+    override def in(q: Query) = f(op(InOp(q)))
+
+}
+
+trait Prefix[A] {
+
+    def not: PrefixOpBuilder[A]
 
     def exists(q: Query): A
 
