@@ -1,4 +1,4 @@
-package st.process
+package st.process.squala
 
 import org.scalatest.Matchers.{not => scalaTestNot, _}
 import org.scalatest._
@@ -12,11 +12,19 @@ class SqualaSpec extends FlatSpec {
     }
 
     "a select with a list of columns from a table" should "generate correct SQL" in {
-        select("x", "y", "z").from("foo").sql should be("select x, y, z from foo")
+        select("x", "y", "z").from("foo").sql should be(
+            """
+              |select x, y, z from foo
+            """.stripMargin.trim
+        )
     }
 
     "a select with a list of columns from a table with an alias" should "generate correct SQL" in {
-        select("x", "y", "z").from("foo").as("f").sql should be("select x, y, z from foo f")
+        select("x", "y", "z").from("foo").as("f").sql should be(
+            """
+              |select x, y, z from foo "f"
+            """.stripMargin.trim
+        )
     }
 
     "a select * from a table where a field equals a bool literal" should "generate correct SQL" in {
@@ -33,7 +41,7 @@ class SqualaSpec extends FlatSpec {
 
     "a select * from a table where a qualified field equals an int literal" should "generate correct SQL" in {
         (select("*") from "foo" as "f" where (("f", "bar") === 42)).sql should
-            be("select * from foo f where (\"f\".bar = 42)")
+            be("""select * from foo "f" where ("f".bar = 42)""")
     }
 
     "a select * from a table where two fields equal two int literals" should "generate correct SQL" in {
@@ -54,15 +62,28 @@ class SqualaSpec extends FlatSpec {
     }
 
     "a select * from a table joined with another table" should "generate correct SQL" in {
-        val q = select("*") from "foo" as "f" innerJoin("bar", "b") on ("b.id" === "f.bar_id")
-        q.sql should be("select * from foo f inner join bar b on (b.id = f.bar_id)")
+        val q = select("*") from "foo" as "f" innerJoin("bar", "b") on (("b", "id") === ("f", "bar_id"))
+        q.sql should be(
+            """
+              |select * from foo "f" inner join bar "b" on ("b".id = "f".bar_id)
+            """.stripMargin.trim
+        )
     }
 
     "a select * from a table joined with 2 tables" should "generate correct SQL" in {
+
         val q = select("*").from("foo").as("f")
-            .innerJoin("bar", "b").on("b.id" === "f.bar_id")
-            .innerJoin("baz", "z").on("z.id" === "b.baz_id")
-        q.sql should be("select * from foo f inner join bar b on (b.id = f.bar_id) inner join baz z on (z.id = b.baz_id)")
+            .innerJoin("bar", "b").on(("b", "id") === ("f", "bar_id"))
+            .innerJoin("baz", "z").on(("z", "id") === ("b", "baz_id"))
+
+        q.sql should be(
+            """
+              |select * from foo "f"
+              |inner join bar "b" on ("b".id = "f".bar_id)
+              |inner join baz "z" on ("z".id = "b".baz_id)
+            """.stripMargin.trim.replaceAllLiterally("\n", " ")
+        )
+
     }
 
 }

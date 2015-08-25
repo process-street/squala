@@ -1,12 +1,10 @@
 package st.process.squala.expressions
 
-import st.process.squala.Cond
+import st.process.squala.{Cond, singleQuote}
 
 case class StrExpr(value: String) extends Cond {
 
-    lazy val sql = quote(value)
-
-    private def quote(value: String) = "'%s'".format(value.replaceAll("'", "''"))
+    lazy val sql = singleQuote(value)
 
 }
 

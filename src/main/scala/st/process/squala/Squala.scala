@@ -29,9 +29,12 @@ case class From(selectList: Select, tableName: String, optionalAlias: Option[Str
 
     def where = WhereBuilder(this)
 
-    lazy val sql =
-        (List(Some(selectList.sql), Some("from"), Some(tableName), optionalAlias).flatten ++ joins.map(_.sql))
-            .mkString(" ")
+    lazy val sql = (List(
+            Some(selectList.sql),
+            Some("from"),
+            Some(tableName),
+            optionalAlias.map(doubleQuote)
+        ).flatten ++ joins.map(_.sql)).mkString(" ")
 
     override def toString = sql
 
@@ -45,7 +48,7 @@ case class JoinBuilder(from: From, tpe: String, tableName: String, alias: String
 
 case class Join(tpe: String, tableName: String, alias: String, cond: Cond) {
 
-    lazy val sql = s"$tpe join $tableName $alias on ${cond.sql}"
+    lazy val sql = s"$tpe join $tableName ${doubleQuote(alias)} on ${cond.sql}"
 
 }
 
